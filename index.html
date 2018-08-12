@@ -1,0 +1,733 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>Yggdrasil Rohan</title>
+        <script src="//cdn.jsdelivr.net/phaser/2.5.0/phaser.min.js"></script>
+    </head>
+    <body>
+   <h1>Tetris Assignment</h1>
+
+   <script src="mygame.js"></script>
+    <script type="text/javascript">
+
+    window.onload = function() {
+    var game = new Phaser.Game(600, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update, render: render  });
+
+        var GameStarted = false;
+        var StartButton;
+        var Blocks;
+        var SingleBlocks;
+        var Keys;
+
+        var UpKey;
+        var LeftKey;
+        var RightKey;
+        var DownKey;
+
+        var KeysImage;
+        var tmp; 
+        var base 
+        var CollisonWithBase = false;
+        var BlocksActive;
+        var SettledBlock;
+        var music;
+        var PointSFX;
+        var GridImage;
+        var SingleBlock;
+        var timer;
+        var ScoreText;
+        var score=0;
+        var InfoText;
+        var nextIn;
+        var blocknames 
+
+        function preload () { //Loading required assets here
+            game.load.image('girdImage', './assets/1-grid.png');
+            game.load.image('sta', './assets/startgame.png');
+            game.load.image("I_1-3", './assets/I_1-3.png');
+            game.load.image("J_1", './assets/J_1.png');
+            game.load.image("L_1", './assets/L_1.png');
+            game.load.image("O_1-2-3-4",'./assets/O_1-2-3-4.png');
+            game.load.image("S_1-3", './assets/S_1-3.png');
+            game.load.image("T_1", './assets/T_1.png');
+            game.load.image("Z_1-3", './assets/Z_1-3.png');
+            game.load.image("keysImage", './assets/keys.jpg');
+            game.load.image("block_blue", './assets/block_blue.png');
+            game.load.image("block_cyan", './assets/block_cyan.png');
+            game.load.image("block_green", './assets/block_green.png');
+            game.load.image("block_orange",'./assets/block_orange.png');
+            game.load.image("block_purple", './assets/block_purple.png');
+            game.load.image("block_red", './assets/block_red');
+            game.load.image("block_yellow", './assets/block_yellow.png');
+            game.load.audio("arcade-game-loop", './sfx/arcade-game-loop.mp3'); //Bg Sfx
+            game.load.audio("PointSFX", './sfx/point.ogg');
+        }
+
+
+        var BackGridImage;
+
+        function create () { //Drawing on the canvas initially
+            BlocksActive = game.add.group();
+            SettledBlock = game.add.group();
+            BackGridImage = game.add.group();
+             text = game.add.text(game.world.centerX+50, 30, "Score : 00", {
+        font: "25px Arial",
+        fill: "#ff0044",
+        align: "center"
+    });
+        
+        InfoText  = game.add.text(game.world.centerX, game.world.centerY+100, "1. Rotate fuctionality incomplete \n2. Rotates the block - buggy \n3. Line destroy issue \n3. Score updates when line is completed", {
+            font: "15px Arial",
+            fill: "#ff0044",
+            align: "left"
+             });
+
+
+        NextInText  = game.add.text(360, 120, "NEXT IN..", {
+                font: "20px Arial",
+                fill: "#ff2244",
+                align: "left"
+             });
+
+            music = game.add.audio('arcade-game-loop');
+            PointSFX = game.add.audio('PointSFX');
+            music.loop = true;
+            UpKey = game.input.keyboard.addKey(Phaser.Keyboard.UP);
+            LeftKey = game.input.keyboard.addKey(Phaser.Keyboard.LEFT);
+            RightKey = game.input.keyboard.addKey(Phaser.Keyboard.RIGHT);
+            DownKey = game.input.keyboard.addKey(Phaser.Keyboard.DOWN);
+
+            UpKey.onDown.add(RotateBlock, this);
+            LeftKey.onDown.add(MoveBlockToLeft, this);
+            RightKey.onDown.add(MoveBlockToRight, this);
+            DownKey.onDown.add(MoveBlockToDown, this);
+
+            game.physics.startSystem(Phaser.Physics.ARCADE);
+           GridImage = game.add.sprite(30, 30,'girdImage');
+           GridImage.alpha = 0.4;
+           BackGridImage.add(GridImage);
+           game.world.sendToBack(BackGridImage);
+          
+            keysImage = game.add.sprite(300,250,"keysImage");
+            keysImage.scale.setTo(.3,.3);
+
+            Keys = game.input.keyboard.createCursorKeys();
+            StartButton = game.add.sprite((GridImage.width/2)+25, game.world.centerY-game.world.centerY-500, 'sta');
+            StartButton.anchor.setTo(0.5, 0.5);
+            StartButton.scale.setTo(.5,.5);
+            StartButton.inputEnabled = true;
+            StartButton.events.onInputDown.add(calback, this);
+
+            game.add.tween(StartButton).to({ y: game.world.centerY }, 1200, Phaser.Easing.Elastic.InOut, true, 0);
+
+            base  = game.add.sprite(game.world.centerX, game.world.height-5, 'base');
+            base.anchor.setTo(0.5, 0.5);
+            base.scale.setTo(1,.05);
+            
+            blocknames = ["I_1-3", "O_1-2-3-4", "J_1", "L_1", "T_1","Z_1-3", "S_1-3"];
+
+            SingleBlocks = ["block_cyan","block_yellow","block_blue","block_orange","block_purple","block_red","block_green"];
+
+            
+            SingleBlock = game.add.sprite((GridImage.position.x + 107),(GridImage.position.y+477),'block_blue');
+            SingleBlock.anchor.setTo(0.5, 0.5);
+            SingleBlock.scale.setTo(1.2,1.2);
+            SingleBlock.alpha = 0.0;
+
+           fill2DimensionsArray(arr, rows, columns);
+
+         GenerateNumber();
+         GetNextRandom();
+
+        }
+
+        var RandomBlock;
+        var NextRandom;
+
+        function GenerateNumber(){ //Current Random Block
+          RandomBlock = game.rnd.integerInRange(0, 6);
+         // return RandomBlock;
+        }
+
+        function GetNextRandom(){  //Next Random Block
+          NextRandom = game.rnd.integerInRange(0, 6);
+        }
+
+        
+        var squ = [[],[]];
+        var lin = [];
+        var Lblock= [[],[]];
+        var Tblock= [[],[]];
+        var Zblock = [[],[]];
+        var Z2block = [[],[]];
+        var L2block= [[],[]];
+
+        var SquareBlockArray = [[1,1],
+                                [1,1]];
+
+        var LineBlockArray = [1,1,1,1];
+
+        var LBlockArray = [[1,0,0],
+                           [1,1,1]];
+
+        var L2BlockArray = [[0,0,1],
+                           [1,1,1]];
+
+        var TBlockArray = [[0,1,0],
+                           [1,1,1]];
+
+        var ZBlockArray = [[1,1,0],
+                           [0,1,1]];
+
+        var Z2BlockArray = [[0,1,1],
+                           [1,1,0]];
+
+       // var SquareBlockGroup; 
+       // var LineBlockGroup;
+       var CurrentActiveBlock;
+       var StartPosForSquare
+        function createSquareBlock(){ 
+            CurrentActiveBlock = game.add.group();
+            var offsetX =.7;
+            var BlockWidth = SingleBlock.width;
+            var BlockHeight = SingleBlock.height;;
+            var BlockOffsetX =3.8;
+            var BlockOffsetY =2.75;
+            var FirstPosX = GridImage.position.x + 15;  
+            var FirstPosY = GridImage.position.y+15;
+             StartPosForSquare = 4; 
+
+            CurrentActiveBlock.x = FirstPosX+((BlockWidth + BlockOffsetX) *StartPosForSquare);
+            CurrentActiveBlock.y = FirstPosY;
+            CurrentActiveBlock.pivot.x = FirstPosX+((BlockWidth + BlockOffsetX) *StartPosForSquare);
+            CurrentActiveBlock.pivot.y = FirstPosY;
+
+            nextIn = game.add.sprite(380,160,blocknames[NextRandom]);
+
+            //Radom create blocks
+         switch(RandomBlock) {  // Generate Blocks 
+              case 0:
+              //create line
+                for(var i=0;i<4;i++){
+                    if(LineBlockArray[i]==1){
+                  lin[i] = game.add.sprite( FirstPosX+((BlockWidth + BlockOffsetX) *StartPosForSquare) +(i*22.3)+(offsetX),FirstPosY ,'block_cyan');
+                  lin[i].anchor.setTo(0.5, 0.5);
+                  lin[i].scale.setTo(1.2,1.2);
+                  CurrentActiveBlock.add(lin[i]);
+                }
+              } 
+              break;
+
+              case 1:
+             //create square
+
+             for(var i=0;i<SquareBlockArray[0].length;i++){
+                for(var j=0; j<SquareBlockArray[1].length;j++){
+                    if(SquareBlockArray[i][j]==1){
+                  squ[i][j] = game.add.sprite( FirstPosX+((BlockWidth + BlockOffsetX) *StartPosForSquare) +(j*22.3)+(offsetX) ,FirstPosY + (BlockHeight + BlockOffsetY) *i ,'block_yellow');
+                  squ[i][j].anchor.setTo(0.5, 0.5);
+                  squ[i][j].scale.setTo(1.2,1.2);
+                  CurrentActiveBlock.add(squ[i][j]);
+                }
+                } 
+              } 
+
+              break;
+
+             case 2:
+             //create L Block
+             var rand = game.rnd.integerInRange(0, 1);
+             for(var i=0;i<2;i++){
+                for(var j=0; j<3;j++){
+                   // console.log("i : "+i +" ---  j :"+j);
+                    if(LBlockArray[i][j]==1){
+                        Lblock[i][j] = game.add.sprite( FirstPosX+((BlockWidth + BlockOffsetX) *StartPosForSquare) +(j*22.3)+(offsetX) ,FirstPosY + (BlockHeight + BlockOffsetY) *i ,'block_blue');
+                  Lblock[i][j].anchor.setTo(0.5, 0.5);
+                  Lblock[i][j].scale.setTo(1.2,1.2);
+                  CurrentActiveBlock.add(Lblock[i][j]);
+                }
+                } 
+              } 
+
+              break;
+
+                case 3:
+             //create L 2 Block
+             console.log("Creating L2 Block : "+L2BlockArray.length);
+             var rand = game.rnd.integerInRange(0, 1);
+             for(var i=0;i<2;i++){
+                for(var j=0; j<3;j++){
+                   // console.log("i : "+i +" ---  j :"+j);
+                    if(L2BlockArray[i][j]==1){
+                        L2block[i][j] = game.add.sprite( FirstPosX+((BlockWidth + BlockOffsetX) *StartPosForSquare) +(j*22.3)+(offsetX) ,FirstPosY + (BlockHeight + BlockOffsetY) *i ,'block_orange');
+
+                  L2block[i][j].anchor.setTo(0.5, 0.5);
+                  L2block[i][j].scale.setTo(1.2,1.2);
+                  CurrentActiveBlock.add(L2block[i][j]);
+                }
+                } 
+              } 
+
+              break;
+
+               case 4:
+               //create T Block
+                for(var i=0;i<2;i++){
+                for(var j=0; j<3;j++){
+                  if(TBlockArray[i][j]==1){
+                        Tblock[i][j] = game.add.sprite( FirstPosX+((BlockWidth + BlockOffsetX) *StartPosForSquare) +(j*22.3)+(offsetX) ,FirstPosY + (BlockHeight + BlockOffsetY) *i ,'block_purple');
+                  Tblock[i][j].anchor.setTo(0.5, 0.5);
+                  Tblock[i][j].scale.setTo(1.2,1.2);
+                  CurrentActiveBlock.add(Tblock[i][j]);
+                }
+              }
+               }
+               
+
+              break;
+
+              case 5:
+              //create Z Block
+             for(var i=0;i<2;i++){
+                for(var j=0; j<3;j++){
+                    //console.log("i : "+i +" ---  j :"+j);
+                    if(ZBlockArray[i][j]==1){
+                        Zblock[i][j] = game.add.sprite( FirstPosX+((BlockWidth + BlockOffsetX) *StartPosForSquare) +(j*22.3)+(offsetX) ,FirstPosY + (BlockHeight + BlockOffsetY) *i ,'block_red');
+                  Zblock[i][j].anchor.setTo(0.5, 0.5);
+                  Zblock[i][j].scale.setTo(1.2,1.2);
+                  CurrentActiveBlock.add(Zblock[i][j]);
+                }
+                } 
+              } 
+              break;
+
+              case 6:
+              //create 2 Block
+             for(var i=0;i<2;i++){
+                for(var j=0; j<3;j++){
+                    //console.log("i : "+i +" ---  j :"+j);
+                    if(Z2BlockArray[i][j]==1){
+                        Z2block[i][j] = game.add.sprite( FirstPosX+((BlockWidth + BlockOffsetX) *StartPosForSquare) +(j*22.3)+(offsetX) ,FirstPosY + (BlockHeight + BlockOffsetY) *i ,'block_green'); //block_green
+                  Z2block[i][j].anchor.setTo(0.5, 0.5);
+                  Z2block[i][j].scale.setTo(1.2,1.2);
+                  CurrentActiveBlock.add(Z2block[i][j]);
+                }
+                } 
+              } 
+              break;
+
+          }
+        }
+
+var arr = []; //Array that holds 0,1 - 0 is empty | 1 is alloted
+var rows = 22;
+var columns = 10;
+
+var BlockImageArr = [];
+
+    function fill2DimensionsArray(arr, rows, columns){ //Create the Gird
+    for (var i = 0; i < rows; i++) {
+        arr.push([0])
+        BlockImageArr.push([0])
+        for (var j = 0; j < columns; j++) {
+            arr[i][j] = 0;
+            BlockImageArr[i][j] = null;
+        }
+      }
+    }
+
+
+        function RotateBlock(){
+          CurrentActiveBlock.angle = CurrentActiveBlock.angle+90;
+        }
+
+        function MoveBlockToRight(){
+          if(GameStarted)
+           CheckRightSpace();
+        }
+
+        function CheckRightSpace(){
+
+              switch(RandomBlock) { //RandomBlock
+              case 0: //line
+               if(arr[CurrentBlockStartI][StartPosForSquare +3]==0 &&(StartPosForSquare<6)){
+              StartPosForSquare = StartPosForSquare+1;
+              CurrentActiveBlock.position.x = CurrentActiveBlock.position.x + SingleBlock.width + 3.8;
+              // return true;
+             } else {
+             }
+              break;
+
+              case 1: //square
+              if(arr[CurrentBlockStartI][StartPosForSquare +2] == 0 && arr[CurrentBlockStartI +1][StartPosForSquare+2] == 0 &&StartPosForSquare <9){
+            //  console.log("pos avaliable");
+              StartPosForSquare = StartPosForSquare+1;
+           // console.log("StartPosForSquare : "+StartPosForSquare);
+            CurrentActiveBlock.position.x = CurrentActiveBlock.position.x +SingleBlock.width+3.8;
+                 // return true;
+             }
+              break;
+
+              case 2: // L  Block
+               if(arr[CurrentBlockStartI+1][StartPosForSquare +3]==0 &&(StartPosForSquare<7)){
+             // console.log("pos avaliable");
+              StartPosForSquare = StartPosForSquare+1;
+              CurrentActiveBlock.position.x = CurrentActiveBlock.position.x + SingleBlock.width + 3.8;
+              // return true;
+             }
+              break;
+
+              case 3: // L 2 Block
+              case 4:
+              case 5:
+               if(arr[CurrentBlockStartI][StartPosForSquare +3]==0 && arr[CurrentBlockStartI+1][StartPosForSquare +3]==0 &&(StartPosForSquare<7)){
+              StartPosForSquare = StartPosForSquare+1;
+              CurrentActiveBlock.position.x = CurrentActiveBlock.position.x + SingleBlock.width + 3.8;
+              // return true;
+             } 
+              break;
+
+              case 6:
+               if(arr[CurrentBlockStartI][StartPosForSquare +3]==0  &&(StartPosForSquare<7)){
+              StartPosForSquare = StartPosForSquare+1;
+              CurrentActiveBlock.position.x = CurrentActiveBlock.position.x + SingleBlock.width + 3.8;
+              // return true;
+             }
+              break;
+        }
+      }
+
+         function MoveBlockToLeft(){ //45
+          if(GameStarted)
+          CheckLeftSpace();
+          }
+
+      function CheckLeftSpace(){
+        switch(RandomBlock) { //RandomBlock
+
+              case 0: //line
+            if(arr[CurrentBlockStartI][StartPosForSquare -1]==0 &&(StartPosForSquare>=0)){
+              StartPosForSquare = StartPosForSquare-1;
+              CurrentActiveBlock.position.x = CurrentActiveBlock.position.x - SingleBlock.width - 3.8;
+             }
+              break;
+
+              case 1: //square
+            if(arr[CurrentBlockStartI][StartPosForSquare -1] == 0 && arr[CurrentBlockStartI +1][StartPosForSquare-1] == 0 &&(StartPosForSquare>=0)){
+              StartPosForSquare = StartPosForSquare-1;
+              CurrentActiveBlock.position.x = CurrentActiveBlock.position.x - SingleBlock.width - 3.8;
+              // return true;
+             }
+              break;
+
+              case 2: // L  Block
+            if(arr[CurrentBlockStartI][StartPosForSquare -1] == 0 && arr[CurrentBlockStartI +1][StartPosForSquare-1] == 0 &&(StartPosForSquare>=0)){
+              StartPosForSquare = StartPosForSquare-1;
+              CurrentActiveBlock.position.x = CurrentActiveBlock.position.x - SingleBlock.width - 3.8;
+              // return true;
+             }
+              break;
+
+              case 3: 
+              case 4:
+              case 6:
+              // L 2 Block
+            if(arr[CurrentBlockStartI +1][StartPosForSquare-1] == 0 &&(StartPosForSquare>=0)){
+              StartPosForSquare = StartPosForSquare-1;
+              CurrentActiveBlock.position.x = CurrentActiveBlock.position.x - SingleBlock.width - 3.8;
+             } 
+              break;
+
+              case 5:
+            if(arr[CurrentBlockStartI][StartPosForSquare -1] == 0 &&(StartPosForSquare>=0)){
+              StartPosForSquare = StartPosForSquare-1;
+              CurrentActiveBlock.position.x = CurrentActiveBlock.position.x - SingleBlock.width - 3.8;
+              // return true;
+             }
+              break;
+           }
+
+        }
+
+        var BlockCurrPosY =0;
+        var CurrentBlockStartI =0;
+         function MoveBlockToDown(){
+                if(GameStarted)
+               if(CheckGirdArrayForBlockDown()){
+                  CurrentActiveBlock.position.y = CurrentActiveBlock.position.y +SingleBlock.height+2.75; 
+                } else {
+               timer.stop();
+                }
+      }
+
+      function resetAndCallNextBlock(){
+        //Reset Variables
+        //console.log("calling reset ");
+          CurrentBlockStartI =0;
+           nextIn.destroy();
+          RandomBlock = NextRandom;
+          GetNextRandom();
+         createSquareBlock();
+         StartGameTimer();
+      }
+
+      function CheckGirdArrayForBlockDown(){
+        var tmp=[];
+            switch(RandomBlock) { //RandomBlock
+             case 0:
+              //line
+             if(CurrentBlockStartI<21)
+           {
+                if(arr[CurrentBlockStartI+1][StartPosForSquare]==0 && arr[CurrentBlockStartI+1][StartPosForSquare+1]==0 && arr[CurrentBlockStartI+1][StartPosForSquare+2]==0 && arr[CurrentBlockStartI+1][StartPosForSquare+3]==0){
+                    CurrentBlockStartI = CurrentBlockStartI+1;
+                    return true;
+                } else {
+                updateGridArray(LineBlockArray,1);
+                // console.log(arr);
+                }
+              } else {
+                 updateGridArray(LineBlockArray,1);
+                // console.log(arr);
+
+              }
+              break;
+
+          case 1:
+          // square
+            
+          if(CurrentBlockStartI<20)
+           {
+             if(arr[CurrentBlockStartI +2][StartPosForSquare +0] == 0 && arr[CurrentBlockStartI +2][StartPosForSquare+1] == 0){
+              CurrentBlockStartI = CurrentBlockStartI+1;
+                  return true;
+             } else {
+               updateGridArray(SquareBlockArray,2);
+             // console.log(arr);
+               return false;
+             }
+            } else {
+              updateGridArray(SquareBlockArray,2);
+             // console.log(arr);
+
+            } 
+              break;
+
+             case 2:
+               // L  Block
+             if(CurrentBlockStartI<20)
+           {
+             if(arr[CurrentBlockStartI +2][StartPosForSquare +0] == 0 && arr[CurrentBlockStartI +2][StartPosForSquare+1] == 0 && arr[CurrentBlockStartI +2][StartPosForSquare+2] == 0){
+              CurrentBlockStartI = CurrentBlockStartI+1;
+              return true;
+             } else {
+              updateGridArray(LBlockArray,2);
+             // console.log(arr);
+               return false;
+             }
+            } else {
+                updateGridArray(LBlockArray,2);
+             // console.log(arr);
+            }
+
+              break;
+
+                case 3:
+             //create L 2 Block
+              if(CurrentBlockStartI<20)
+              {
+             if(arr[CurrentBlockStartI +2][StartPosForSquare +0] == 0 && arr[CurrentBlockStartI +2][StartPosForSquare+1] == 0 && arr[CurrentBlockStartI +2][StartPosForSquare+2] == 0){
+              CurrentBlockStartI = CurrentBlockStartI+1;
+              return true;
+             } else {
+              updateGridArray(L2BlockArray,2);
+            //  console.log(arr);
+               return false;
+             }
+            }else {
+              updateGridArray(L2BlockArray,2);
+            //   console.log(arr);
+            }
+              break;
+
+               case 4:
+               
+                //create T Block
+              if(CurrentBlockStartI<20)
+              {
+             if(arr[CurrentBlockStartI +2][StartPosForSquare +0] == 0 && arr[CurrentBlockStartI +2][StartPosForSquare+1] == 0 && arr[CurrentBlockStartI +2][StartPosForSquare+2] == 0){
+              CurrentBlockStartI = CurrentBlockStartI+1;
+              return true;
+             } else {
+               updateGridArray(TBlockArray,2);
+             // console.log(arr);
+               return false;
+             }
+            }else {
+                 updateGridArray(TBlockArray,2);
+            //   console.log(arr);
+            }
+
+              break;
+
+              case 5: //ZBlockArray
+              // Z Block
+              if(CurrentBlockStartI<20)
+              {
+             if(arr[CurrentBlockStartI +1][StartPosForSquare] == 0 && arr[CurrentBlockStartI +2][StartPosForSquare+1] == 0 && arr[CurrentBlockStartI +2][StartPosForSquare+2] == 0){
+              CurrentBlockStartI = CurrentBlockStartI+1;
+              return true;
+             } else {
+                 updateGridArray(ZBlockArray,2);
+            //  console.log(arr);
+               return false;
+             }
+            }else {
+              updateGridArray(ZBlockArray,2);
+             //  console.log(arr);
+            }
+
+              break;
+
+              case 6:
+              //Z 2 Block
+              if(CurrentBlockStartI<20)
+              {
+             if(arr[CurrentBlockStartI +2][StartPosForSquare +0] == 0 && arr[CurrentBlockStartI +2][StartPosForSquare+1] == 0 && arr[CurrentBlockStartI +1][StartPosForSquare+2] == 0){
+              CurrentBlockStartI = CurrentBlockStartI+1;
+              return true;
+             } else {
+                updateGridArray(Z2BlockArray,2);
+            //  console.log(arr);
+               return false;
+             }
+            }else {
+
+              updateGridArray(Z2BlockArray,2);
+            // console.log(arr);
+            }
+
+              break;
+
+          }
+      }
+
+          var ChildArr;
+         function updateGridArray(arrGrid, blockID){ //Update the array Grid 
+           switch(blockID){
+              case 1 :
+                  ChildArr = CurrentActiveBlock.children;
+                 // console.log(ChildArr);
+                for(var i=0;i<4;i++){
+                    arr[CurrentBlockStartI][StartPosForSquare+i] = 1;
+                    BlockImageArr[CurrentBlockStartI][StartPosForSquare+i] = game.add.sprite(ChildArr[i].worldPosition.x -(ChildArr[i].width/2)+.4 ,ChildArr[i].worldPosition.y - ChildArr[i].height/2 +.5,SingleBlocks[RandomBlock]);
+                    BlockImageArr[CurrentBlockStartI][StartPosForSquare+i].scale.setTo(1.2,1.2);
+                }
+               checkForRowFull();
+                CurrentActiveBlock.removeAll();
+              break;
+
+              case 2:
+               ChildArr = CurrentActiveBlock.children;
+                //  console.log(ChildArr);
+               for(var i=0;i<2;i++){
+                for(var j=0; j<3;j++){
+                   if(arrGrid[i][j]==1){
+                  arr[CurrentBlockStartI + i][StartPosForSquare +j] = 1; //Block settled
+                   for(var k=0;k<4;k++){
+                  BlockImageArr[CurrentBlockStartI+i][StartPosForSquare+j] = game.add.sprite(ChildArr[k].worldPosition.x -(ChildArr[k].width/2)+.4 ,ChildArr[k].worldPosition.y - ChildArr[k].height/2 +.5,SingleBlocks[RandomBlock]);
+                    BlockImageArr[CurrentBlockStartI+i][StartPosForSquare+j].scale.setTo(1.2,1.2);
+                    }
+                }
+              }
+              } 
+               checkForRowFull();
+              CurrentActiveBlock.removeAll();
+              break;
+            }
+             console.log(arr);
+           resetAndCallNextBlock();
+      }
+
+      function checkForRowFull(){ //Check if the line is completed
+        var LineCompleteCount =0;
+        var LineNo;
+
+       // console.log(BlockImageArr);
+
+        for (var i = 0; i < rows; i++) {
+        for (var j = 0; j < columns; j++) {
+
+           if(arr[i][j]==1){
+            LineCompleteCount=LineCompleteCount+1;  
+            if(LineCompleteCount==10)
+              {
+                 LineNo=i; //i
+                 console.log("Line : "+LineNo + " is Full");
+                 for(var x =0; x<10 ; x++){
+                    arr[LineNo][x] = 0;  
+                    BlockImageArr[LineNo][x].destroy(); 
+                    BlockImageArr[LineNo][x]=null; 
+                }
+                 PointSFX.play();
+                score= score+5;
+              text.setText("Score : "+score);
+              console.log(arr);
+             // console.log(BlockImageArr);
+              LineCompleteCount=0;
+              LineNo =0;
+              }
+            }
+
+          }
+          LineCompleteCount=0;
+              LineNo =0;
+        } 
+
+      }
+
+
+          function same(a) {
+                if (!a.length) return true;
+                return !a.filter(function (e) {
+                return e !== a[0];
+                 }).length;
+          }
+      
+           function update() {
+
+               }
+
+            function collisionHandler (obj1, obj2) {
+                 game.stage.backgroundColor = '#992d2d';
+                 CollisonWithBase = true;
+                   // SettledBlock=tmp;
+                   SettledBlock.add(tmp);
+                   tmp = null;
+                 setTimeout(function() { GenerateRandomBlock(); }, 1000);
+            }
+           
+
+        function render() {
+          }
+
+       function calback(){ //Clicked on Start Button
+             music.play();
+            GameStarted = true;
+            createSquareBlock();
+            //GenerateRandomBlock();
+            game.add.tween(StartButton).to({ y: 700 }, 1500, Phaser.Easing.Elastic.InOut, true, 0);
+            StartGameTimer();
+        }
+
+        function StartGameTimer(){ //Call MoveBlockToDown every 1 sec
+          timer = game.time.create(false);
+             timer.loop(1000, MoveBlockToDown, this);
+             timer.start();
+        } 
+
+    };
+
+    </script>
+    </body>
+</html>
